@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🐛 Bug Catcher — Mini Jogo de Programação</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Share+Tech+Mono&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #060612;
+    font-family: 'Share Tech Mono', monospace;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  /* Scanlines */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.08) 3px, rgba(0,0,0,0.08) 4px);
+    pointer-events: none;
+    z-index: 1000;
+  }
+
+  #terminal {
+    width: 700px;
+    max-width: 98vw;
+    background: #0a0d1f;
+    border: 2px solid #00ff9f;
+    border-radius: 8px;
+    box-shadow: 0 0 40px rgba(0,255,159,0.25), inset 0 0 60px rgba(0,0,40,0.6);
+    overflow: hidden;
+    position: relative;
+  }
+
+  #titlebar {
+    background: #00ff9f;
+    padding: 7px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .dot { width: 12px; height: 12px; border-radius: 50%; }
+  .dot.r { background: #ff5f56; }
+  .dot.y { background: #ffbd2e; }
+  .dot.g { background: #27c93f; }
+  #titlebar span {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 9px;
+    color: #060612;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  #game-area {
+    padding: 20px;
+    min-height: 500px;
+    position: relative;
+  }
+
+  /* SCREENS */
+  .screen { display: none; }
+  .screen.active { display: block; }
+
+  /* START SCREEN */
+  #start-screen {
+    text-align: center;
+    padding: 30px 20px;
+  }
+  .logo {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 22px;
+    color: #00ff9f;
+    text-shadow: 0 0 20px rgba(0,255,159,0.6);
+    line-height: 1.6;
+    margin-bottom: 10px;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%,100% { text-shadow: 0 0 20px rgba(0,255,159,0.6); }
+    50% { text-shadow: 0 0 40px rgba(0,255,159,1), 0 0 80px rgba(0,255,159,0.4); }
+  }
+  .subtitle {
+    color: #4af0c0;
+    font-size: 13px;
+    margin-bottom: 30px;
+  }
+  .bug-art {
+    font-size: 52px;
+    margin: 20px 0;
+    animation: bounce 1s infinite alternate;
+  }
+  @keyframes bounce {
+    from { transform: translateY(0); }
+    to { transform: translateY(-10px); }
+  }
+  .desc {
+    color: #7dffd5;
+    font-size: 13px;
+    line-height: 2;
+    background: rgba(0,255,159,0.06);
+    border: 1px solid rgba(0,255,159,0.2);
+    border-radius: 6px;
+    padding: 16px;
+    margin: 20px 0;
+    text-align: left;
+  }
+  .desc b { color: #00ff9f; }
+  #btn-start {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 11px;
+    background: #00ff9f;
+    color: #060612;
+    border: none;
+    padding: 14px 32px;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-top: 16px;
+    transition: all 0.15s;
+    letter-spacing: 1px;
+  }
+  #btn-start:hover {
+    background: #60ffc6;
+    transform: scale(1.05);
+    box-shadow: 0 0 20px rgba(0,255,159,0.5);
+  }
+
+  /* GAME SCREEN */
+  #game-screen { position: relative; }
+  #hud {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(0,255,159,0.2);
+    font-size: 13px;
+  }
+  .hud-item { color: #4af0c0; }
+  .hud-val {
+    color: #00ff9f;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 11px;
+  }
+  #timer-bar-wrap {
+    height: 6px;
+    background: rgba(0,255,159,0.1);
+    border-radius: 3px;
+    margin-bottom: 14px;
+    overflow: hidden;
+  }
+  #timer-bar {
+    height: 100%;
+    background: #00ff9f;
+    border-radius: 3px;
+    transition: width 0.1s linear, background 0.3s;
+  }
+
+  #code-display {
+    background: #060d1c;
+    border: 1px solid rgba(0,255,159,0.25);
+    border-radius: 6px;
+    padding: 18px;
+    margin-bottom: 16px;
+    font-size: 15px;
+    line-height: 2;
+    color: #7dffd5;
+    min-height: 110px;
+    position: relative;
+  }
+  #code-display .line-num {
+    color: rgba(0,255,159,0.3);
+    user-select: none;
+    margin-right: 12px;
+    font-size: 12px;
+  }
+  .token-keyword { color: #ff7edb; }
+  .token-string  { color: #ffe37a; }
+  .token-number  { color: #80d8ff; }
+  .token-var     { color: #7dffd5; }
+  .token-op      { color: #aaa; }
+  .token-bug {
+    color: #ff4f4f;
+    background: rgba(255,79,79,0.15);
+    border-bottom: 2px solid #ff4f4f;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: all 0.1s;
+    padding: 1px 3px;
+    animation: bug-glow 1s infinite alternate;
+  }
+  .token-bug:hover {
+    background: rgba(255,79,79,0.35);
+    transform: scale(1.08);
+  }
+  @keyframes bug-glow {
+    from { text-shadow: none; }
+    to { text-shadow: 0 0 8px rgba(255,79,79,0.8); }
+  }
+  .token-correct {
+    color: #00ff9f;
+    background: rgba(0,255,159,0.12);
+    border-radius: 2px;
+    padding: 1px 3px;
+    animation: correct-flash 0.4s ease;
+  }
+  @keyframes correct-flash {
+    0% { background: rgba(0,255,159,0.6); transform: scale(1.15); }
+    100% { background: rgba(0,255,159,0.12); transform: scale(1); }
+  }
+
+  #question-box {
+    background: rgba(0,255,159,0.04);
+    border: 1px solid rgba(0,255,159,0.2);
+    border-radius: 6px;
+    padding: 14px 16px;
+    margin-bottom: 14px;
+    color: #00ff9f;
+    font-size: 14px;
+    min-height: 54px;
+  }
+  #question-box .q-label {
+    font-size: 11px;
+    color: rgba(0,255,159,0.5);
+    margin-bottom: 4px;
+  }
+
+  #options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .opt-btn {
+    background: rgba(0,255,159,0.05);
+    border: 1px solid rgba(0,255,159,0.3);
+    color: #7dffd5;
+    padding: 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    text-align: left;
+    transition: all 0.15s;
+    line-height: 1.4;
+  }
+  .opt-btn:hover { background: rgba(0,255,159,0.12); border-color: #00ff9f; color: #fff; }
+  .opt-btn.correct-ans { background: rgba(0,255,159,0.25); border-color: #00ff9f; color: #00ff9f; }
+  .opt-btn.wrong-ans   { background: rgba(255,79,79,0.15); border-color: #ff4f4f; color: #ff4f4f; }
+
+  #feedback {
+    font-size: 13px;
+    min-height: 22px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: all 0.2s;
+  }
+  #feedback.ok  { color: #00ff9f; background: rgba(0,255,159,0.08); }
+  #feedback.err { color: #ff6b6b; background: rgba(255,79,79,0.08); }
+
+  #progress-dots {
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+    margin-top: 12px;
+  }
+  .pdot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: rgba(0,255,159,0.15);
+    border: 1px solid rgba(0,255,159,0.3);
+    transition: all 0.2s;
+  }
+  .pdot.done { background: #00ff9f; box-shadow: 0 0 6px rgba(0,255,159,0.6); }
+  .pdot.miss { background: #ff4f4f; box-shadow: 0 0 6px rgba(255,79,79,0.6); }
+
+  /* RESULT SCREEN */
+  #result-screen { text-align: center; padding: 20px; }
+  #result-emoji { font-size: 60px; margin: 10px 0; }
+  #result-title {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 16px;
+    color: #00ff9f;
+    margin-bottom: 10px;
+  }
+  #result-score {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 28px;
+    color: #60ffc6;
+    margin: 16px 0;
+    text-shadow: 0 0 20px rgba(0,255,159,0.6);
+  }
+  #result-msg { color: #7dffd5; font-size: 14px; line-height: 2; margin-bottom: 20px; }
+  #result-facts {
+    background: rgba(0,255,159,0.05);
+    border: 1px solid rgba(0,255,159,0.2);
+    border-radius: 6px;
+    padding: 14px 16px;
+    margin-bottom: 20px;
+    text-align: left;
+    font-size: 13px;
+    color: #4af0c0;
+    line-height: 2.2;
+  }
+  #result-facts b { color: #00ff9f; }
+  #btn-restart {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 10px;
+    background: transparent;
+    color: #00ff9f;
+    border: 2px solid #00ff9f;
+    padding: 12px 28px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  #btn-restart:hover {
+    background: #00ff9f;
+    color: #060612;
+    box-shadow: 0 0 20px rgba(0,255,159,0.4);
+  }
+
+  /* floating +1 */
+  .float-pts {
+    position: fixed;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 13px;
+    color: #00ff9f;
+    pointer-events: none;
+    z-index: 999;
+    animation: floatUp 0.8s ease-out forwards;
+  }
+  @keyframes floatUp {
+    0%   { opacity: 1; transform: translateY(0); }
+    100% { opacity: 0; transform: translateY(-60px); }
+  }
+  .float-pts.minus { color: #ff4f4f; }
+</style>
+</head>
+<body>
+<div id="terminal">
+  <div id="titlebar">
+    <div class="dot r"></div>
+    <div class="dot y"></div>
+    <div class="dot g"></div>
+    <span>bug_catcher.py — Mini Jogo de Programação</span>
+  </div>
+
+  <div id="game-area">
+
+    <!-- START SCREEN -->
+    <div id="start-screen" class="screen active">
+      <div class="logo">🐛 BUG<br>CATCHER</div>
+      <div class="subtitle">// mini jogo de programação</div>
+      <div class="bug-art">🔍</div>
+      <div class="desc">
+        <b>Como jogar:</b><br>
+        Você vai ver um trecho de código com um <span style="color:#ff4f4f">bug sublinhado</span>.<br>
+        Leia o código, entenda o erro e escolha a <b>resposta correta</b>.<br><br>
+        <b>⏱ 15 segundos</b> por pergunta · <b>10 questões</b> no total<br>
+        Cada acerto vale <b>+10 pontos</b> · Resposta rápida = bônus!
+      </div>
+      <button id="btn-start">▶ INICIAR JOGO</button>
+    </div>
+
+    <!-- GAME SCREEN -->
+    <div id="game-screen" class="screen">
+      <div id="hud">
+        <span class="hud-item">PONTOS: <span id="score-val" class="hud-val">0</span></span>
+        <span class="hud-item">QUESTÃO: <span id="q-num" class="hud-val">1/10</span></span>
+        <span class="hud-item">⏱ <span id="timer-val" class="hud-val">15</span>s</span>
+      </div>
+      <div id="timer-bar-wrap"><div id="timer-bar" style="width:100%"></div></div>
+      <div id="code-display"></div>
+      <div id="question-box"><div class="q-label">// pergunta</div><span id="q-text"></span></div>
+      <div id="options"></div>
+      <div id="feedback"></div>
+      <div id="progress-dots"></div>
+    </div>
+
+    <!-- RESULT SCREEN -->
+    <div id="result-screen" class="screen">
+      <div id="result-emoji"></div>
+      <div id="result-title"></div>
+      <div id="result-score"></div>
+      <div id="result-msg"></div>
+      <div id="result-facts"></div>
+      <button id="btn-restart">↺ JOGAR DE NOVO</button>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const QUESTIONS = [
+  {
+    code: `<span class="line-num">1</span><span class="token-keyword">def</span> <span class="token-var">somar</span>(a, b):\n<span class="line-num">2</span>    <span class="token-keyword">return</span> <span class="token-var">a</span> <span class="token-op">-</span> <span class="token-bug" id="bug">b</span>`,
+    bugLabel: "b",
+    question: "Esta função deveria somar a e b, mas tem um bug. Qual é o problema?",
+    options: ["O nome da função está errado", "Está usando - em vez de +", "Falta o : no final", "O parâmetro b não existe"],
+    correct: 1,
+    explanation: "O operador está errado! '-' subtrai, mas queríamos '+' para somar.",
+    concept: "Operadores aritméticos: + soma, - subtrai, * multiplica, / divide"
+  },
+  {
+    code: `<span class="line-num">1</span><span class="token-var">nome</span> <span class="token-op">=</span> <span class="token-string">"Ana"</span>\n<span class="line-num">2</span><span class="token-keyword">print</span>(<span class="token-bug" id="bug">Nome</span>)`,
+    bugLabel: "Nome",
+    question: "O código tenta imprimir a variável 'nome', mas dá erro. Por quê?",
+    options: ["print não existe em Python", "Python diferencia maiúsculas e minúsculas", "Faltam aspas em 'Nome'", "O = está errado"],
+    correct: 1,
+    explanation: "Python é case-sensitive! 'nome' e 'Nome' são variáveis diferentes.",
+    concept: "Case-sensitive: linguagens de programação distinguem maiúsculas e minúsculas"
+  },
+  {
+    code: `<span class="line-num">1</span><span class="token-keyword">for</span> <span class="token-var">i</span> <span class="token-keyword">in</span> <span class="token-var">range</span>(<span class="token-number">5</span>):\n<span class="line-num">2</span><span class="token-keyword">print</span>(<span class="token-bug" id="bug">i</span>)`,
+    bugLabel: "print(i)",
+    question: "Este loop deveria imprimir 0,1,2,3,4 mas dá IndentationError. O problema é:",
+    options: ["range(5) deveria ser range(0,5)", "O print não está indentado (recuado)", "Falta o : depois do for", "A variável i não foi declarada"],
+    correct: 1,
+    explanation: "Em Python, o corpo do loop DEVE estar indentado (com espaços ou tab).",
+    concept: "Indentação em Python define blocos de código — é obrigatória!"
+  },
+  {
+    code: `<span class="line-num">1</span><span class="token-var">lista</span> <span class="token-op">=</span> [<span class="token-number">10</span>, <span class="token-number">20</span>, <span class="token-number">30</span>]\n<span class="line-num">2</span><span class="token-keyword">print</span>(<span class="token-var">lista</span>[<span class="token-bug" id="bug">3</span>])`,
+    bugLabel: "3",
+    question: "A lista tem 3 elementos. O código tenta acessar lista[3] mas dá IndexError. Por quê?",
+    options: ["Listas não suportam índices", "O índice máximo é 2, não 3", "Deveria ser lista(3) com parênteses", "O número 3 não está na lista"],
+    correct: 1,
+    explanation: "Índices começam em 0! Lista com 3 elementos: índices 0, 1, 2. O índice 3 não existe.",
+    concept: "Indexação começa em zero: o 1º elemento é [0], o 2º é [1], e assim por diante"
+  },
+  {
+    code: `<span class="line-num">1</span><span class="token-var">x</span> <span class="token-op">=</span> <span class="token-number">10</span>\n<span class="line-num">2</span><span class="token-keyword">if</span> <span class="token-var">x</span> <span class="token-bug" id="bug">=</span> <span class="token-number">10</span>:\n<span class="line-num">3</span>    <span class="token-keyword">print</span>(<span class="token-string">"dez!"</span>)`,
+    bugLabel: "=",
+    question: "Queremos verificar se x é igual a 10, mas o código dá SyntaxError. O problema é:",
+    options: ["Falta else no final", "= é atribuição, para comparar usa-se ==", "x não foi definido antes do if", "print precisa de parênteses duplos"],
+    correct: 1,
+    explanation: "= atribui valor. Para comparar, use == (dois iguais). if x == 10 é o correto.",
+    concept: "= atribui · == compara · != diferente · > maior · < menor"
+  },
+  {
+    code: `<span class="line-num">1</span><span class="token-keyword">def</span> <span class="token-var">dobro</span>(n):\n<span class="line-num">2</span>    resultado <span class="token-op">=</span> n <span class="token-op">*</span> <span class="token-number">2</span>\n<span class="line-num">3</span>\n<span class="line-num">4</span><span class="token-keyword">print</span>(<span class="token-var">dobro</span>(<span class="token-bug" id="bug">5</span>))`,
+    bugLabel: "dobro(5)",
+    question: "A função 'dobro' calcula o dobro mas imprime 'None'. Por quê?",
+    options: ["5 não é um número válido", "Falta o return na função", "print não funciona com funções", "Deveria ser dobro(n=5)"],
+    correct: 1,
+    explanation: "Sem return, a função retorna None automaticamente. Adicione: return resultado",
+    concept: "return envia o resultado de volta para quem chamou a função"
+  },
+  {
+    code: `<span class="line-num">1</span><span class="token-var">num</span> <span class="token-op">=</span> <span class="token-keyword">input</span>(<span class="token-string">"Digite um número: "</span>)\n<span class="line-num">2</span><span class="token-keyword">print</span>(<span class="token-var">num</span> <span class="token-op">+</span> <span class="token-bug" id="bug">10</span>)`,
+    bugLabel: "10",
+    question: "O código tenta somar o número digitado com 10, mas dá TypeError. O problema é:",
+    options: ["input() não existe em Python", "input() retorna texto (str), não número", "Não se pode somar com print", "O número 10 deveria estar entre aspas"],
+    correct: 1,
+    explanation: "input() sempre retorna string! Converta com int(): num = int(input(...))",
+    concept: "Tipos de dados: int (inteiro), float (decimal), str (texto), bool (verdadeiro/falso)"
+  },
+  {
+    code: `<span class="line-num">1</span><span class="token-var">contador</span> <span class="token-op">=</span> <span class="token-number">0</span>\n<span class="line-num">2</span><span class="token-keyword">while</span> <span class="token-bug" id="bug"><span class="token-keyword">True</span></span>:\n<span class="line-num">3</span>    <span class="token-var">contador</span> <span class="token-op">+=</span> <span class="token-number">1</span>`,
+    bugLabel: "True",
+    question: "Este código conta indefinidamente e nunca para. É um loop infinito! Como corrigir?",
+    options: ["Trocar while por for", "Adicionar break ou condição de parada", "Mudar True para False", "Remover o contador"],
+    correct: 1,
+    explanation: "while True roda pra sempre. Adicione: if contador == 10: break",
+    concept: "Loops precisam de condição de parada para não travarem o programa"
+  },
+  {
+    code: `<span class="line-num">1</span><span class="token-keyword">def</span> <span class="token-var">dividir</span>(a, b):\n<span class="line-num">2</span>    <span class="token-keyword">return</span> <span class="token-var">a</span> <span class="token-op">/</span> <span class="token-var">b</span>\n<span class="line-num">3</span>\n<span class="line-num">4</span><span class="token-keyword">print</span>(<span class="token-var">dividir</span>(<span class="token-bug" id="bug">10, 0</span>))`,
+    bugLabel: "10, 0",
+    question: "O código tenta dividir 10 por 0 e dá ZeroDivisionError. A boa prática é:",
+    options: ["Nunca usar funções para divisão", "Verificar se b == 0 antes de dividir", "Usar // em vez de /", "Multiplicar por -1 o resultado"],
+    correct: 1,
+    explanation: "Divisão por zero é impossível! Use if b == 0: return 'Erro' antes de dividir.",
+    concept: "Tratamento de erros: sempre valide os dados antes de usá-los"
+  },
+  {
+    code: `<span class="line-num">1</span><span class="token-var">frutas</span> <span class="token-op">=</span> [<span class="token-string">"maçã"</span>, <span class="token-string">"banana"</span>]\n<span class="line-num">2</span><span class="token-var">frutas</span>.<span class="token-bug" id="bug">add</span>(<span class="token-string">"uva"</span>)`,
+    bugLabel: "add",
+    question: "O código tenta adicionar 'uva' à lista, mas dá AttributeError. Por quê?",
+    options: ["Listas não podem ter frutas", "O método correto para listas é append()", "add() só funciona com números", "Deveria ser frutas + 'uva'"],
+    correct: 1,
+    explanation: ".add() é de conjuntos (set). Para listas, use .append('uva')",
+    concept: "Métodos de lista: append() adiciona · remove() remove · sort() ordena · len() conta"
+  }
+];
+
+let currentQ = 0, score = 0, timer = 15, timerInterval, history = [];
+const shuffle = arr => [...arr].sort(() => Math.random() - 0.5);
+let questions = [];
+
+function $(id) { return document.getElementById(id); }
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  $(id).classList.add('active');
+}
+
+function startGame() {
+  questions = shuffle(QUESTIONS);
+  currentQ = 0; score = 0; history = [];
+  showScreen('game-screen');
+  renderDots();
+  loadQuestion();
+}
+
+function renderDots() {
+  const d = $('progress-dots');
+  d.innerHTML = '';
+  questions.forEach(() => {
+    const dot = document.createElement('div');
+    dot.className = 'pdot';
+    d.appendChild(dot);
+  });
+}
+
+function loadQuestion() {
+  clearInterval(timerInterval);
+  const q = questions[currentQ];
+  $('q-num').textContent = `${currentQ+1}/${questions.length}`;
+  $('q-text').textContent = q.question;
+  $('feedback').textContent = '';
+  $('feedback').className = '';
+  $('code-display').innerHTML = q.code.replace(/\n/g, '<br>');
+
+  const opts = $('options');
+  opts.innerHTML = '';
+  q.options.forEach((opt, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'opt-btn';
+    btn.textContent = `${['A','B','C','D'][i]}) ${opt}`;
+    btn.onclick = () => answer(i, btn);
+    opts.appendChild(btn);
+  });
+
+  startTimer();
+}
+
+function startTimer() {
+  timer = 15;
+  $('timer-val').textContent = timer;
+  $('timer-bar').style.width = '100%';
+  $('timer-bar').style.background = '#00ff9f';
+
+  timerInterval = setInterval(() => {
+    timer--;
+    $('timer-val').textContent = timer;
+    const pct = (timer / 15) * 100;
+    $('timer-bar').style.width = pct + '%';
+    if (timer <= 5) $('timer-bar').style.background = '#ff4f4f';
+    else if (timer <= 9) $('timer-bar').style.background = '#ffbd2e';
+    if (timer <= 0) { clearInterval(timerInterval); timeOut(); }
+  }, 1000);
+}
+
+function timeOut() {
+  disableOptions();
+  history.push(false);
+  updateDot(currentQ, false);
+  $('feedback').textContent = '⏱ Tempo esgotado! ' + questions[currentQ].explanation;
+  $('feedback').className = 'err';
+  setTimeout(nextQuestion, 2200);
+}
+
+function answer(idx, btn) {
+  clearInterval(timerInterval);
+  disableOptions();
+  const q = questions[currentQ];
+  const correct = idx === q.correct;
+
+  document.querySelectorAll('.opt-btn').forEach((b, i) => {
+    if (i === q.correct) b.classList.add('correct-ans');
+    else if (i === idx && !correct) b.classList.add('wrong-ans');
+  });
+
+  if (correct) {
+    const bonus = Math.floor(timer / 15 * 5);
+    const pts = 10 + bonus;
+    score += pts;
+    $('score-val').textContent = score;
+    $('feedback').textContent = `✓ Correto! +${pts} pontos. ${q.concept}`;
+    $('feedback').className = 'ok';
+    floatPoints(`+${pts}`, true);
+    history.push(true);
+  } else {
+    $('feedback').textContent = `✗ Errado. ${q.explanation}`;
+    $('feedback').className = 'err';
+    floatPoints('-', false);
+    history.push(false);
+  }
+
+  updateDot(currentQ, correct);
+  setTimeout(nextQuestion, 2200);
+}
+
+function floatPoints(text, pos) {
+  const el = document.createElement('div');
+  el.className = 'float-pts' + (pos ? '' : ' minus');
+  el.textContent = text;
+  el.style.left = (Math.random() * 200 + 250) + 'px';
+  el.style.top = (Math.random() * 80 + 200) + 'px';
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 900);
+}
+
+function updateDot(idx, ok) {
+  const dots = document.querySelectorAll('.pdot');
+  dots[idx].classList.add(ok ? 'done' : 'miss');
+}
+
+function disableOptions() {
+  document.querySelectorAll('.opt-btn').forEach(b => b.onclick = null);
+}
+
+function nextQuestion() {
+  currentQ++;
+  if (currentQ >= questions.length) { showResult(); return; }
+  loadQuestion();
+}
+
+function showResult() {
+  showScreen('result-screen');
+  const total = questions.length * 10;
+  const pct = Math.round((score / (total + questions.length * 5)) * 100);
+  const acertos = history.filter(Boolean).length;
+
+  let emoji, title, msg;
+  if (acertos >= 9) { emoji='🏆'; title='MESTRE DO CÓDIGO!'; msg='Impressionante! Você é um verdadeiro programador. Quase sem bugs!'; }
+  else if (acertos >= 7) { emoji='⭐'; title='DESENVOLVEDOR!'; msg='Muito bom! Você entende bem de programação. Continue praticando!'; }
+  else if (acertos >= 5) { emoji='💻'; title='APRENDIZ DE DEV!'; msg='Bom começo! Com prática você elimina todos os bugs!'; }
+  else { emoji='🐛'; title='OS BUGS VENCERAM!'; msg='Não desanime! Programação se aprende errando. Tente de novo!'; }
+
+  $('result-emoji').textContent = emoji;
+  $('result-title').textContent = title;
+  $('result-score').textContent = `${score} pts · ${acertos}/10`;
+  $('result-msg').textContent = msg;
+  $('result-facts').innerHTML = `
+    <b>💡 O que você aprendeu hoje:</b><br>
+    ✓ Operadores: = atribui, == compara, + soma<br>
+    ✓ Python é case-sensitive (nome ≠ Nome)<br>
+    ✓ Indentação define blocos de código<br>
+    ✓ Índices começam em 0<br>
+    ✓ input() retorna texto — converta com int()<br>
+    ✓ return envia resultado das funções<br>
+    ✓ Loops precisam de condição de parada<br>
+    ✓ Trate erros antes que aconteçam!
+  `;
+}
+
+$('btn-start').onclick = startGame;
+$('btn-restart').onclick = startGame;
+</script>
+</body>
+</html>
